@@ -1,72 +1,58 @@
 package server
 
 import (
+	"embed"
 	"fmt"
-	"net/http"
-	"strconv"
+	"os"
+	"strings"
+
+	"github.com/gorilla/sessions"
+	"github.com/labstack/echo-contrib/session"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
+	"github.com/markbates/goth"
+	"github.com/markbates/goth/providers/google"
 
 	app "btct/app"
-	"github.com/labstack/echo/v4"
 )
 
-func FuncTaskIndex() echo.HandlerFunc {
-	return func(c echo.Context) error {
-		return c.String(http.StatusOK, "Task Queue API")
-	}
-}
+const PORT = "42069"
 
-func FuncTaskId(appInstance *app.App) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		taskId, err := strconv.Atoi(c.Param("id"))
-		if err != nil {
-			return c.String(http.StatusBadRequest, "Invalid task id")
-		}
-		task, err := appInstance.GetTask(taskId)
-		if err != nil {
-			return c.String(http.StatusNotFound, fmt.Sprintf("Err: %v", err))
-		}
-		return c.JSON(http.StatusOK, task)
-	}
-}
+func StartServer(appInstance *app.App, staticFiles embed.FS) {
 
-func FuncTaskAdd(appInstance *app.App) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		description := c.FormValue("description")
-		if description == "" {
-			return c.String(http.StatusBadRequest, "Task description is required")
-		}
-		task := appInstance.AddTask(description)
-		return c.JSON(http.StatusCreated, task)
-	}
-}
+	goth.UseProviders(
+		google.New(
+			os.Getenv("GOOGLE_CLIENT_ID"),
+			os.Getenv("GOOGLE_CLIENT_SECRET"),
+			"http://localhost:42069/auth/google/callback",
+			"email", "profile",
+		),
+	)
+	e := echo.New()
 
-func FuncTaskMarkComplete(appInstance *app.App) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		id, err := strconv.Atoi(c.Param("id"))
-		if err != nil {
-			return c.String(http.StatusBadRequest, "Invalid task ID")
-		}
-		err = appInstance.MarkTaskComplete(id)
-		if err != nil {
-			return c.String(http.StatusNotFound, err.Error())
-		}
-		return c.String(http.StatusOK, fmt.Sprintf("Task %d marked as complete", id))
-	}
-}
+	// Middleware
+	e.Use(middleware.Logger())
+	e.Use(middleware.Recover())
+	secret := os.Getenv("BTCT_SECRET")
+	e.Use(session.Middleware(sessions.NewCookieStore([]byte(secret))))
 
-// FuncTaskFromNFC handles NFC requests to add tasks based on query params
-func FuncTaskFromNFC(appInstance *app.App) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		// Extract query parameters
-		taskDescription := c.QueryParam("description")
-		if taskDescription == "" {
-			return c.String(http.StatusBadRequest, "Task description is required")
-		}
+	// Serve static files from the embedded `dist` directory
+	e.StaticFS("/", echo.MustSubFS(staticFiles, "dist"))
 
-		// Add task to the app's task queue
-		task := appInstance.AddTask(taskDescription)
+	// oauth routes
+	// --- OAuth routes ---
+	e.GET("/auth/google", FuncGoogleLogin())
+	e.GET("/auth/google/callback", FuncGoogleLoginCallback())
 
-		// Return the created task as a JSON response
-		return c.JSON(http.StatusCreated, task)
-	}
+	// api routes
+	api := e.Group("/api", requireAuth)
+	api.GET("/", FuncTaskIndex())
+	api.GET("/task/:id", FuncTaskId(appInstance))
+	api.POST("/tasks/create", FuncTaskAdd(appInstance))
+	api.PUT("/tasks/:id/complete", FuncTaskMarkComplete(appInstance))
+	api.POST("/nfc", FuncTaskFromNFC(appInstance))
+
+	// start app
+	e.Logger.Fatal(e.Start(fmt.Sprintf(":%s", PORT)))
+
 }
