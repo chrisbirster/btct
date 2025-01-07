@@ -4,7 +4,6 @@ import (
 	"embed"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/gorilla/sessions"
 	"github.com/labstack/echo-contrib/session"
@@ -19,7 +18,6 @@ import (
 const PORT = "42069"
 
 func StartServer(appInstance *app.App, staticFiles embed.FS) {
-
 	goth.UseProviders(
 		google.New(
 			os.Getenv("GOOGLE_CLIENT_ID"),
@@ -28,6 +26,7 @@ func StartServer(appInstance *app.App, staticFiles embed.FS) {
 			"email", "profile",
 		),
 	)
+
 	e := echo.New()
 
 	// Middleware
@@ -41,12 +40,13 @@ func StartServer(appInstance *app.App, staticFiles embed.FS) {
 
 	// oauth routes
 	// --- OAuth routes ---
-	e.GET("/auth/google", FuncGoogleLogin())
-	e.GET("/auth/google/callback", FuncGoogleLoginCallback())
+	e.GET("/auth/:provider", FuncGoogleLogin())
+	e.GET("/auth/:provider/callback", FuncGoogleLoginCallback())
 
 	// api routes
 	api := e.Group("/api", requireAuth)
 	api.GET("/", FuncTaskIndex())
+	api.GET("/me", FuncMe())
 	api.GET("/task/:id", FuncTaskId(appInstance))
 	api.POST("/tasks/create", FuncTaskAdd(appInstance))
 	api.PUT("/tasks/:id/complete", FuncTaskMarkComplete(appInstance))

@@ -96,6 +96,14 @@ func FuncTaskFromNFC(appInstance *app.App) echo.HandlerFunc {
 // FuncGoogleLogin handles google auth
 func FuncGoogleLogin() echo.HandlerFunc {
 	return func(c echo.Context) error {
+		gothic.GetProviderName = func(req *http.Request) (string, error) {
+			provider := c.Param("provider")
+			if provider != "" {
+				return provider, nil
+			}
+			return "", c.String(http.StatusBadRequest, "unable to get provider")
+		}
+
 		gothic.BeginAuthHandler(c.Response().Writer, c.Request())
 		return nil
 	}
@@ -117,12 +125,15 @@ func FuncGoogleLoginCallback() echo.HandlerFunc {
 		sess.Values["user_id"] = user.UserID
 		sess.Values["avatar_url"] = user.AvatarURL
 		sess.Values["email"] = user.Email
+
+		log.Printf("Session values before save: %+v", sess.Values)
 		err = sess.Save(c.Request(), c.Response().Writer)
 		if err != nil {
+			log.Printf("Error saving session: %v", err)
 			return c.String(http.StatusBadRequest, err.Error())
 		}
 
-		return nil
+		return c.Redirect(http.StatusTemporaryRedirect, "/")
 	}
 }
 
@@ -136,10 +147,35 @@ func requireAuth(next echo.HandlerFunc) echo.HandlerFunc {
 		userID, ok := sess.Values["user_id"].(string)
 		if !ok || userID == "" {
 			// not logged in
-			c.Redirect(http.StatusTemporaryRedirect, "/auth/google")
+			c.Redirect(http.StatusSeeOther, "/auth/google")
 		}
 
 		// user logged in
 		return next(c)
+	}
+}
+
+func FuncMe() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		sess, err := session.Get(SESSION, c)
+		if err != nil {
+			return c.NoContent(http.StatusInternalServerError)
+		}
+
+		userID, ok := sess.Values["user_id"].(string)
+		if !ok || userID == "" {
+			// Not logged in
+			return c.NoContent(http.StatusUnauthorized)
+		}
+
+		email, _ := sess.Values["email"].(string)
+		avatarURL, _ := sess.Values["avatar_url"].(string)
+
+		// Return user info (or just "logged_in": true)
+		return c.JSON(http.StatusOK, map[string]interface{}{
+			"user_id":    userID,
+			"email":      email,
+			"avatar_url": avatarURL,
+		})
 	}
 }

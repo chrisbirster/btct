@@ -7,6 +7,7 @@ import { App } from "./App";
 const Home = lazy(() => import("./pages/Home"));
 const Tasks = lazy(() => import("./pages/Tasks"));
 const Task = lazy(() => import("./pages/Task"));
+const Login = lazy(() => import("./pages/Login"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const root = document.getElementById("root");
@@ -20,6 +21,7 @@ if (!root) {
         <Route path="/" component={Home} />
         <Route path="/tasks" component={Tasks} />
         <Route path="/tasks/:id" component={Task} />
+        <Route path="/login" component={Login} />
         <Route path="*paramName" component={NotFound} />
       </Router>
     ),

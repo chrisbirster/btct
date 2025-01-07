@@ -11,9 +11,14 @@ function Login() {
   return (
     <div>
       <h1>Please Log In</h1>
-      <a class={loginButton} href="/auth/google">
+      <button
+        class={loginButton}
+        onClick={() => {
+          window.location.href = "/auth/google";
+        }}
+      >
         Login with Google
-      </a>
+      </button>
     </div>
   );
 }
