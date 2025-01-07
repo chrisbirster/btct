@@ -2,7 +2,17 @@
 // versions:
 //   sqlc v1.27.0
 
-package app
+package database
+
+import (
+	"database/sql"
+)
+
+type Migration struct {
+	ID          int64
+	Count       sql.NullInt64
+	Description string
+}
 
 type Task struct {
 	ID          int64

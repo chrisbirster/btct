@@ -1,0 +1,12 @@
+	CREATE TABLE IF NOT EXISTS tasks (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		description TEXT NOT NULL,
+		complete BOOLEAN NOT NULL DEFAULT 0, 
+    owner_id TEXT NOT NULL DEFAULT 'default_user');
+	);
+
+	CREATE TABLE IF NOT EXISTS migrations (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+    count INTEGER,
+		description TEXT NOT NULL
+  );

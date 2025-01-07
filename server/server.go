@@ -3,6 +3,7 @@ package server
 import (
 	"embed"
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/gorilla/sessions"
@@ -29,21 +30,32 @@ func StartServer(appInstance *app.App, staticFiles embed.FS) {
 
 	e := echo.New()
 
-	// Middleware
+	// --- Middleware ---
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 	secret := os.Getenv("BTCT_SECRET")
-	e.Use(session.Middleware(sessions.NewCookieStore([]byte(secret))))
+	if secret == "" {
+		log.Fatal("BTCT_SECRET environment variable is not set")
+	}
+
+	store := sessions.NewCookieStore([]byte(secret))
+	store.Options = &sessions.Options{
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   86400 * 7, // 7 days
+		// Secure:   true,
+		// SameSite: http.SameSiteLaxMode,
+	}
+	e.Use(session.Middleware(store))
 
 	// Serve static files from the embedded `dist` directory
 	e.StaticFS("/", echo.MustSubFS(staticFiles, "dist"))
 
-	// oauth routes
 	// --- OAuth routes ---
 	e.GET("/auth/:provider", FuncGoogleLogin())
 	e.GET("/auth/:provider/callback", FuncGoogleLoginCallback())
 
-	// api routes
+	// --- API routes ---
 	api := e.Group("/api", requireAuth)
 	api.GET("/", FuncTaskIndex())
 	api.GET("/me", FuncMe())
@@ -51,6 +63,9 @@ func StartServer(appInstance *app.App, staticFiles embed.FS) {
 	api.POST("/tasks/create", FuncTaskAdd(appInstance))
 	api.PUT("/tasks/:id/complete", FuncTaskMarkComplete(appInstance))
 	api.POST("/nfc", FuncTaskFromNFC(appInstance))
+
+	// --- catch all ---
+	// e.GET("/*", FuncCatchAll(staticFiles))
 
 	// start app
 	e.Logger.Fatal(e.Start(fmt.Sprintf(":%s", PORT)))

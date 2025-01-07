@@ -1,12 +1,14 @@
 package server
 
 import (
+	"embed"
 	"fmt"
 	"log"
 	"net/http"
 	"strconv"
 
 	app "btct/app"
+	database "btct/database"
 
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
@@ -42,7 +44,7 @@ func FuncTaskAdd(appInstance *app.App) echo.HandlerFunc {
 		if description == "" {
 			return c.String(http.StatusBadRequest, "Task description is required")
 		}
-		task, err := appInstance.Queries.CreateTask(c.Request().Context(), app.CreateTaskParams{
+		task, err := appInstance.Queries.CreateTask(c.Request().Context(), database.CreateTaskParams{
 			Description: description,
 			Complete:    false,
 		})
@@ -59,7 +61,7 @@ func FuncTaskMarkComplete(appInstance *app.App) echo.HandlerFunc {
 		if err != nil {
 			return c.String(http.StatusBadRequest, "Invalid task ID")
 		}
-		err = appInstance.Queries.UpdateTaskComplete(c.Request().Context(), app.UpdateTaskCompleteParams{
+		err = appInstance.Queries.UpdateTaskComplete(c.Request().Context(), database.UpdateTaskCompleteParams{
 			Complete: true,
 			ID:       id,
 		})
@@ -80,7 +82,7 @@ func FuncTaskFromNFC(appInstance *app.App) echo.HandlerFunc {
 		}
 
 		// Add task to the app's task queue
-		task, err := appInstance.Queries.CreateTask(c.Request().Context(), app.CreateTaskParams{
+		task, err := appInstance.Queries.CreateTask(c.Request().Context(), database.CreateTaskParams{
 			Description: description,
 			Complete:    false,
 		})
@@ -177,5 +179,16 @@ func FuncMe() echo.HandlerFunc {
 			"email":      email,
 			"avatar_url": avatarURL,
 		})
+	}
+}
+
+func FuncCatchAll(staticFiles embed.FS) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		file, err := staticFiles.Open("dist/index.html")
+		if err != nil {
+			return c.String(http.StatusInternalServerError, "Failed to load index.html")
+		}
+		defer file.Close()
+		return c.Stream(http.StatusOK, "text/html; charset=utf-8", file)
 	}
 }

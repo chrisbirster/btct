@@ -3,10 +3,11 @@
 //   sqlc v1.27.0
 // source: query.sql
 
-package app
+package database
 
 import (
 	"context"
+	"database/sql"
 )
 
 const createTask = `-- name: CreateTask :one
@@ -40,6 +41,29 @@ func (q *Queries) DeleteTask(ctx context.Context, id int64) error {
 	return err
 }
 
+const getLatestMigration = `-- name: GetLatestMigration :one
+SELECT count FROM migrations
+`
+
+func (q *Queries) GetLatestMigration(ctx context.Context) (sql.NullInt64, error) {
+	row := q.db.QueryRowContext(ctx, getLatestMigration)
+	var count sql.NullInt64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const getMigration = `-- name: GetMigration :one
+SELECT id, count, description FROM migrations 
+WHERE id = ? LIMIT 1
+`
+
+func (q *Queries) GetMigration(ctx context.Context, id int64) (Migration, error) {
+	row := q.db.QueryRowContext(ctx, getMigration, id)
+	var i Migration
+	err := row.Scan(&i.ID, &i.Count, &i.Description)
+	return i, err
+}
+
 const getTask = `-- name: GetTask :one
 SELECT id, description, complete FROM tasks 
 WHERE id = ? LIMIT 1
@@ -50,6 +74,33 @@ func (q *Queries) GetTask(ctx context.Context, id int64) (Task, error) {
 	var i Task
 	err := row.Scan(&i.ID, &i.Description, &i.Complete)
 	return i, err
+}
+
+const listMigrations = `-- name: ListMigrations :many
+SELECT id, count, description FROM migrations
+`
+
+func (q *Queries) ListMigrations(ctx context.Context) ([]Migration, error) {
+	rows, err := q.db.QueryContext(ctx, listMigrations)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Migration
+	for rows.Next() {
+		var i Migration
+		if err := rows.Scan(&i.ID, &i.Count, &i.Description); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listTasks = `-- name: ListTasks :many

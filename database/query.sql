@@ -32,3 +32,15 @@ RETURNING *;
 -- name: DeleteTask :exec
 DELETE FROM tasks
 WHERE id = ?;
+
+
+-- name: GetMigration :one
+SELECT * FROM migrations 
+WHERE id = ? LIMIT 1;
+
+-- name: ListMigrations :many
+SELECT * FROM migrations;
+
+-- name: GetLatestMigration :one
+SELECT count FROM migrations;
+

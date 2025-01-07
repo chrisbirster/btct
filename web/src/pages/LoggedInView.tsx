@@ -10,6 +10,7 @@ export const LoggedInView = (props: any) => {
         <A href="/login">Login</A>
         <A href="/tasks">Tasks</A>
       </nav>
+      <p>Hello</p>
       {props.children}
     </div>
   );
