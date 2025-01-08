@@ -4,7 +4,6 @@ import Login from "./pages/Login";
 
 export const App = (props: any) => {
   const [user, setUser] = createSignal(null);
-  console.log(props);
 
   onMount(async () => {
     try {
@@ -27,7 +26,7 @@ export const App = (props: any) => {
   return (
     <div>
       <Show when={user()} fallback={<Login />}>
-        <LoggedInView user={user()} />
+        <LoggedInView user={user()} {...props} />
       </Show>
     </div>
   );

@@ -1,7 +1,6 @@
 package server
 
 import (
-	"embed"
 	"fmt"
 	"log"
 	"net/http"
@@ -35,6 +34,15 @@ func FuncTaskId(appInstance *app.App) echo.HandlerFunc {
 			return c.String(http.StatusNotFound, fmt.Sprintf("Err: %v", err))
 		}
 		return c.JSON(http.StatusOK, task)
+	}
+}
+func FuncTaskList(appInstance *app.App) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		tasks, err := appInstance.Queries.ListTasks(c.Request().Context())
+		if err != nil {
+			return c.String(http.StatusNotFound, fmt.Sprintf("Err: %v", err))
+		}
+		return c.JSON(http.StatusOK, tasks)
 	}
 }
 
@@ -179,16 +187,5 @@ func FuncMe() echo.HandlerFunc {
 			"email":      email,
 			"avatar_url": avatarURL,
 		})
-	}
-}
-
-func FuncCatchAll(staticFiles embed.FS) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		file, err := staticFiles.Open("dist/index.html")
-		if err != nil {
-			return c.String(http.StatusInternalServerError, "Failed to load index.html")
-		}
-		defer file.Close()
-		return c.Stream(http.StatusOK, "text/html; charset=utf-8", file)
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"embed"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/gorilla/sessions"
@@ -16,14 +17,18 @@ import (
 	app "btct/app"
 )
 
-const PORT = "42069"
+var (
+	MODE = os.Getenv("MODE")
+	PORT = os.Getenv("PORT")
+)
 
 func StartServer(appInstance *app.App, staticFiles embed.FS) {
+
 	goth.UseProviders(
 		google.New(
 			os.Getenv("GOOGLE_CLIENT_ID"),
 			os.Getenv("GOOGLE_CLIENT_SECRET"),
-			"http://localhost:42069/auth/google/callback",
+			os.Getenv("GOOGLE_CALLBACK"),
 			"email", "profile",
 		),
 	)
@@ -37,16 +42,19 @@ func StartServer(appInstance *app.App, staticFiles embed.FS) {
 	if secret == "" {
 		log.Fatal("BTCT_SECRET environment variable is not set")
 	}
-
 	store := sessions.NewCookieStore([]byte(secret))
 	store.Options = &sessions.Options{
 		Path:     "/",
 		HttpOnly: true,
 		MaxAge:   86400 * 7, // 7 days
-		// Secure:   true,
-		// SameSite: http.SameSiteLaxMode,
+		Secure:   secure(),
+		SameSite: http.SameSiteLaxMode,
 	}
 	e.Use(session.Middleware(store))
+	e.Use(middleware.StaticWithConfig(middleware.StaticConfig{
+		Root:  "dist",
+		HTML5: true,
+	}))
 
 	// Serve static files from the embedded `dist` directory
 	e.StaticFS("/", echo.MustSubFS(staticFiles, "dist"))
@@ -59,15 +67,20 @@ func StartServer(appInstance *app.App, staticFiles embed.FS) {
 	api := e.Group("/api", requireAuth)
 	api.GET("/", FuncTaskIndex())
 	api.GET("/me", FuncMe())
-	api.GET("/task/:id", FuncTaskId(appInstance))
+	api.GET("/tasks/:id", FuncTaskId(appInstance))
+	api.GET("/tasks", FuncTaskList(appInstance))
 	api.POST("/tasks/create", FuncTaskAdd(appInstance))
 	api.PUT("/tasks/:id/complete", FuncTaskMarkComplete(appInstance))
 	api.POST("/nfc", FuncTaskFromNFC(appInstance))
 
-	// --- catch all ---
-	// e.GET("/*", FuncCatchAll(staticFiles))
-
 	// start app
 	e.Logger.Fatal(e.Start(fmt.Sprintf(":%s", PORT)))
 
+}
+
+func secure() bool {
+	if MODE == "dev" {
+		return false
+	}
+	return true
 }
